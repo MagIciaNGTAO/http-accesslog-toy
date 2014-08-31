@@ -6,6 +6,9 @@
 5. during shutdown, stop the 'monitor'
 '''
 
+from monitor import test
+
 print("I am the console")
 
+test()
 
