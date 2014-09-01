@@ -31,7 +31,7 @@ class Console(object):
 		# threshold = input('please provide high traffic alert on/off "threshold": ')
 		# logpath = input('please provide "logpath": ')
 		threshold = 100
-		logpath = '/Users/mingtaozhang/http-accesslog-toy/sub.log'
+		logpath = '/Users/mingtaozhang/http-accesslog-toy/access.log'
 		# TODO validation of the above
 
 		print('high traffic threshold {0} on logpath {1} "most hit/other stats" display per {2} seconds'
@@ -43,7 +43,8 @@ class Console(object):
 
 		while True:
 		  	time.sleep(Console.interval)
-		  	print(self.__monitor.pull_most_hit())
+		  	section, count = self.__monitor.pull_most_hit()
+		  	print('max hit is {0} on {1}'.format(count, section))
 
 ''' 
 MonitorProvider is just a syntax sugar to get Monitor instance 
