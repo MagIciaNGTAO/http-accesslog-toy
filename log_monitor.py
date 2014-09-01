@@ -1,11 +1,10 @@
-usage_string = """\
+usage = """\
 HTTP log monitoring console program
 	arg1 - an integer, specify threshold for high traffict alert on/off
 	arg2 - a string, specify log file absolute path
 Usage:
 	python3 log_monitor.py 100 /private/var/log/apache2/access_log # start monitoring process
 """
-
 import sys, threading, time, signal, subprocess, re, time, queue
 
 threshold = 10
@@ -17,7 +16,7 @@ tick = 0.1 # tick for 100 miliseconds
 def log(c):
 	print(c)
 
-''' 
+'''
 Console is responsible for 
 1. talking with 'user' to get 'threshold', 'logpath'
 2. starting the 'monitor' in another thread with the 'threshold', 'logpath', console
@@ -49,7 +48,7 @@ class Console(object):
 			# interval = int(sys.argv[4])
 			# tick = float(sys.argv[5])
 		except:
-			log(usage_string)
+			log(usage)
 			sys.exit(-1)
 
 		log('high traffic threshold {0} on logpath {1} "most hit/other stats" display per {2} seconds'
@@ -62,7 +61,7 @@ class Console(object):
 		while True:
 		  	time.sleep(interval)
 		  	section, count = self.monitor.pull_most_hit()
-		  	log('max hit is {0} on {1}'.format(count, section))
+		  	log('Stats for Most Hit: {0} is accessed {1} times'.format(section, count))
 
 ''' 
 Monitor is responsible for
@@ -99,7 +98,7 @@ class Monitor(threading.Thread):
 			# TODO refactoring using visitor pattern
 			section = Monitor.get_section(row)
 			self.timed_queue.put(section)
-			if section is not None:
+			if section is not None and section != '':
 				if section in self.counter:
 					self.counter[section] = self.counter[section] + 1
 				else:
