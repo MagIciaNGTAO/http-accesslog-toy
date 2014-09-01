@@ -1,8 +1,17 @@
+usage_string = """\
+HTTP log monitoring console program
+	arg1 - an integer, specify threshold for high traffict alert on/off
+	arg2 - a string, specify log file absolute path
+Usage:
+	python3 log_monitor.py 100 /private/var/log/apache2/access_log # start monitoring process
+"""
+
 import sys, threading, time, signal, subprocess, re, time, queue
 
-interval = 3 # wait for 10 seconds
-window = 3 # analysis window for 120 seconds
-tick = 0.1;
+threshold = 10
+window = 120 # analysis window for 120 seconds
+interval = 10 # wait for 10 seconds
+tick = 0.1 # tick for 100 miliseconds
 
 # TODO
 def log(c):
@@ -22,7 +31,7 @@ class Console(object):
 		log(message)
 
 	def signal_handler(self, signal, frame):
-		log('user interrupted, shutdown gracefully:')
+		log('user interrupted, shutdown gracefully!')
 		self.monitor.stop()
 		sys.exit(0)
 
@@ -32,16 +41,18 @@ class Console(object):
 		signal.signal(signal.SIGINT, self.signal_handler)
 		signal.signal(signal.SIGTERM, self.signal_handler)
 
-		print('This is a simple log monitoring tool')
+		try:
+			global threshold #, window, interval, tick
+			threshold = int(sys.argv[1])
+			logpath = sys.argv[2]
+			# window = int(sys.argv[3])
+			# interval = int(sys.argv[4])
+			# tick = float(sys.argv[5])
+		except:
+			log(usage_string)
+			sys.exit(-1)
 
-		# threshold = input('please provide high traffic alert on/off "threshold": ')
-		# logpath = input('please provide "logpath": ')
-		threshold = 3
-		logpath = '/private/var/log/apache2/access_log'
-
-		# TODO validation of the above
-
-		print('high traffic threshold {0} on logpath {1} "most hit/other stats" display per {2} seconds'
+		log('high traffic threshold {0} on logpath {1} "most hit/other stats" display per {2} seconds'
 			.format(threshold, logpath, interval)
 		)
 
@@ -136,35 +147,43 @@ class TimeBoundQueue(queue.Queue, threading.Thread):
 		self.console = kwargs['console']
 		self.alertflag = False
 
+	# there is a fixed delay introduced by the 'tick' idea	
+	# NOTE case: high traffic alert on could be more accurate if time_clean_up is called in put
 	def put(self, item):
 		elem = (time.time(), item)
 		self.queue.append(elem)
 
-	# TODO hope this process is fast enough ...
 	def run(self):
 		while True:
 			time.sleep(self.tick)
-			current_time = time.time()
-			valid_timestamp = current_time - self.timeout
-			completed = False
-			while not completed:
-				try:
-					timestamp, item = self.queue[0]
-					if timestamp < valid_timestamp:
-						# Quicker to pop than to remove a value at random position.
-						self.queue.popleft()
-					else:
-						completed = True
-				except IndexError as e:
-					# No elements left
-					break
-			traffic_size = self.qsize()
-			if traffic_size > self.threshold and not(self.alertflag):
-				self.console.alert('High traffic generated an alert - hits = {0}, triggered at {1}'.format(traffic_size, current_time))
-				self.alertflag = True
-			if traffic_size <= self.threshold and self.alertflag:
-				self.console.alert('Traffic alert off - hits = {0}, triggered at {1}'.format(traffic_size, current_time))
-				self.alertflag = False
+			clean_time = self.timed_clean_up()
+			self.alert_routine(clean_time)
+
+	def timed_clean_up(self):
+		current_time = time.time()
+		valid_timestamp = current_time - self.timeout
+		completed = False
+		while not completed:
+			try:
+				timestamp, item = self.queue[0]
+				if timestamp < valid_timestamp:
+					# Quicker to pop than to remove a value at random position.
+					self.queue.popleft()
+				else:
+					completed = True
+			except IndexError as e:
+				# No elements left
+				break
+		return current_time
+
+	def alert_routine(self, clean_time):
+		traffic_size = self.qsize()
+		if traffic_size > self.threshold and not(self.alertflag):
+			self.console.alert('High traffic generated an alert - hits = {0}, triggered at {1}'.format(traffic_size, clean_time))
+			self.alertflag = True
+		if traffic_size <= self.threshold and self.alertflag:
+			self.console.alert('Traffic alert off - hits = {0}, triggered at {1}'.format(traffic_size, clean_time))
+			self.alertflag = False
 
 	def stop(self):
 		self.queue.clear()
