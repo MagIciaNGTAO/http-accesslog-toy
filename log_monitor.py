@@ -31,7 +31,7 @@ class Console(object):
 		# threshold = input('please provide high traffic alert on/off "threshold": ')
 		# logpath = input('please provide "logpath": ')
 		threshold = 100
-		logpath = '/Users/mingtaozhang/http-accesslog-toy/access.log'
+		logpath = '/private/var/log/apache2/access_log'
 		# TODO validation of the above
 
 		print('high traffic threshold {0} on logpath {1} "most hit/other stats" display per {2} seconds'
