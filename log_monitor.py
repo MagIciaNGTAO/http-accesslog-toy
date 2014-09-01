@@ -1,4 +1,4 @@
-import sys, threading, time, signal, subprocess
+import sys, threading, time, signal, subprocess, re
 
 ''' 
 Console is responsible for 
@@ -10,7 +10,7 @@ Console is responsible for
 '''
 class Console(object):
 
-	interval = 10 # wait for 10 seconds
+	interval = 3 # wait for 10 seconds
 
 	def alert(self, traffic_type):
 		print(traffic_type)
@@ -28,8 +28,10 @@ class Console(object):
 
 		print('This is a simple log monitoring tool')
 
-		threshold = input('please provide high traffic alert on/off "threshold": ')
-		logpath = input('please provide "logpath": ')
+		# threshold = input('please provide high traffic alert on/off "threshold": ')
+		# logpath = input('please provide "logpath": ')
+		threshold = 100
+		logpath = '/Users/mingtaozhang/http-accesslog-toy/sub.log'
 		# TODO validation of the above
 
 		print('high traffic threshold {0} on logpath {1} "most hit/other stats" display per {2} seconds'
@@ -57,7 +59,7 @@ class MonitorProvider(object):
 
 ''' 
 Monitor is responsible for
-1. based on 'threshold', 'logpath'; start monitoring - it's similar to tail -f ... not yet sure how it looks like in python :( 
+1. based on 'threshold', 'logpath'; start monitoring
 2. maintain stat
 3. response to pull_most_hit request
 4. trigger alert method
@@ -69,30 +71,47 @@ class Monitor(threading.Thread):
 		self.__threshold = kwargs['threshold']
 		self.__logpath = kwargs['logpath']
 		self.__console = kwargs['console']
-		# self.__queue = Queue.Queue(maxsize=1000) # buffer at most 100 lines
+		self.__counter = dict()
+		self.__maxcount = 0
+		self.__maxsection = 0
 		threading.Thread.__init__(self, *args)
 		self.daemon = True
 
 	def run(self):
 		self.__subprocess = subprocess.Popen(["tail", "-f", self.__logpath], stdout=subprocess.PIPE)
+		log('start tail -f process')
 		while True:
-			line = self.__subprocess.stdout.readline()
-			# self.__queue.put(line)
-			print(line)
-			if not line:
+			row = self.__subprocess.stdout.readline().decode("utf-8")
+			section = Monitor.get_section(row)
+			# TODO self.__console.alert('high traffic')
+			if section != "":
+				if section in self.__counter:
+					self.__counter[section] = self.__counter[section] + 1
+				else:
+					self.__counter[section] = 1
+				if self.__counter[section] > self.__maxcount:
+					self.__maxcount = self.__counter[section]
+					self.__maxsection = section
+			if not row:
 				break
-			self.__console.alert('high traffic')
+
+	def get_section(row):
+		tokens = map(''.join, re.findall(r'\"GET /(.*?) HTTP.*\"', row))
+		for token in tokens:
+			index = token.find("/")
+			if index != -1:
+				token = token[0:index]
+		return token
 
 	def pull_most_hit(self):
-		return 'TOPHITURL'
+		return self.__maxsection, self.__counter[self.__maxsection]
 
 	def stop(self):
-		# TODO
-		print('kill log tailing process')
+		log('kill tail -f process')
 		self.__subprocess.kill()
-		
-# print self.__queue.get() # blocks
-# print self.__queue.get_nowait() # throws Queue.Empty if there are no lines to read
+
+def log(c):
+	print(c)
 
 if __name__ == "__main__":
 	Console().main()
