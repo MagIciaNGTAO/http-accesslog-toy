@@ -65,5 +65,3 @@ class Monitor(threading.Thread):
 
 if __name__ == "__main__":
 	sys.exit(Console().main())
-
-
