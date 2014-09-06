@@ -18,11 +18,11 @@ def log(c):
 
 '''
 Console is responsible for 
-1. talking with 'user' to get 'threshold', 'logpath'
-2. starting the 'monitor' in another thread with the 'threshold', 'logpath', console
-3. periodically (10 secs) pull_most_hit from 'monitor' and display 
-4. passively listen to 'threshold' crossing event with alert method
-5. during shutdown, stop the 'monitor'
+1. get 'threshold', 'logpath' from cli
+2. START:    starting the 'timed_queue', then 'monitor' in another thread
+3. POLL:     periodically ('interval' secs) pull stats from 'monitor'
+4. LISTEN:   passively listen to 'threshold' crossing event with alert method
+5. STOP:     during shutdown, stop the 'monitor'
 '''
 class Console(object):
 
@@ -55,20 +55,22 @@ class Console(object):
 			.format(threshold, logpath, interval)
 		)
 
-		self.monitor = MonitorProvider.get(threshold, logpath, self)
-		self.monitor.start_thread()
+		self.timed_queue = TimeBoundQueueProvider.get(threshold, window, tick, self)
+		self.timed_queue.start()
+
+		self.monitor = MonitorProvider.get(threshold, logpath, self, self.timed_queue)
+		self.monitor.start()
 
 		while True:
 		  	time.sleep(interval)
-		  	section, count = self.monitor.pull_most_hit()
+		  	section, count = self.monitor.pull()
 		  	log('Stats for Most Hit: {0} is accessed {1} times'.format(section, count))
 
 ''' 
 Monitor is responsible for
 1. based on 'threshold', 'logpath'; start monitoring
-2. maintain window stats by staring 'TimeBoundQueue' with a clear tick in another thread
-3. response to pull_most_hit request
-4. release file handler stuff
+2. response to poll request from 'console'
+3. release file handler stuff
 '''
 class Monitor(threading.Thread):
 
@@ -78,16 +80,10 @@ class Monitor(threading.Thread):
 		self.threshold = kwargs['threshold']
 		self.logpath = kwargs['logpath']
 		self.console = kwargs['console']
+		self.timed_queue = kwargs['timed_queue']
 		self.counter = dict()
 		self.maxcount = 0
 		self.maxsection = 0
-
-	def start_thread(self):
-		# start internal stats components
-		self.timed_queue = TimeBoundQueueProvider.get(self.threshold, window, tick, self.console)
-		self.timed_queue.start()
-		# start itself
-		self.start()
 
 	def run(self):
 		self.subprocess = subprocess.Popen(["tail", "-f", self.logpath], stdout=subprocess.PIPE)
@@ -118,7 +114,7 @@ class Monitor(threading.Thread):
 			else:
 				return token
 
-	def pull_most_hit(self):
+	def pull(self):
 		return self.maxsection, self.counter[self.maxsection]
 
 	def stop(self):
@@ -128,8 +124,8 @@ class Monitor(threading.Thread):
 
 ''' 
 TimeBoundQueue
-1. trigger alert method
-2. based on tick cleaning the queue
+1. trigger traffic alert
+2. based on tick interval to clean up the queue
 
 modified based on 
 http://www.acodemics.co.uk/2013/08/29/time-bound-python-queue/
@@ -202,11 +198,12 @@ class TimeBoundQueueProvider(object):
 
 class MonitorProvider(object):
 
-	def get(_threshold, _logpath, _console):
+	def get(_threshold, _logpath, _console, _timed_queue):
 		return Monitor(
 			threshold = _threshold,
 			logpath = _logpath,
 			console = _console,
+			timed_queue = _timed_queue,
 		)
 
 if __name__ == "__main__":
