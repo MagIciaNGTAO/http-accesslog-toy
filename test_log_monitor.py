@@ -25,15 +25,10 @@ clean()
 
 # create
 log_file = open(log_file_name, 'a')
-
-# setup cli parameters
-sys.argv.append(threshold)
-sys.argv.append(log_file_name)
-sys.argv.append(window)
     
 # start monitor
 sut = Console()
-sut.main()
+sut.start_routine(threshold, log_file_name, window)
 sut.fixture = MagicMock()
 
 with open(sample_file_name) as f:
@@ -42,14 +37,12 @@ with open(sample_file_name) as f:
         time.sleep(access_frequency)
         log_file.flush() 
 
+sut.fixture.assert_any_call('on')
+
 time.sleep(waiting_time)
+
+sut.fixture.assert_any_call('off')
 
 sut.stop()
 
-sut.fixture.assert_any_call('on')
-sut.fixture.assert_any_call('off')
-
 clean()
-
-#if __name__ == "__main__":
-#    Console().main()

@@ -7,8 +7,7 @@ Usage:
 """
 import sys, threading, time, signal, subprocess, re, time, queue
 
-threshold = 10
-window = 120 # analysis window for 120 seconds
+default_window = 120 # analysis window for 120 seconds
 interval = 10 # wait for 10 seconds
 tick = 0.1 # tick for 100 miliseconds
 
@@ -38,7 +37,6 @@ class Console(object):
     def signal_handler(self, signal, frame):
         log('user interrupted, shutdown gracefully!')
         self.stop()
-        sys.exit(0)
 
     def stop(self):
         self.polling_stop.set()
@@ -51,6 +49,22 @@ class Console(object):
             section, count = self.monitor.pull()
             log('Stats for Most Hit: {0} is accessed {1} times'.format(section, count))
 
+    def start_routine(self, threshold, log_path, window):
+
+        if window is None:
+            self.timed_queue = TimeBoundQueueProvider.get(threshold, default_window, tick, self)
+        else:
+            self.timed_queue = TimeBoundQueueProvider.get(threshold, window, tick, self)
+        self.timed_queue.start()
+
+        self.monitor = MonitorProvider.get(threshold, log_path, self, self.timed_queue)
+        self.monitor.start()
+
+        self.polling_stop = threading.Event()
+        self.stats_polling_thread = threading.Thread(target = self.stats_poll, args=(self.polling_stop,))
+        self.stats_polling_thread.start()
+
+
     def main(self):
         self.polling = True
 
@@ -59,10 +73,8 @@ class Console(object):
         signal.signal(signal.SIGTERM, self.signal_handler)
 
         try:
-            global threshold, window #, interval, tick
             threshold = int(sys.argv[1])
             log_path = sys.argv[2]
-            window = int(sys.argv[3])
             # interval = int(sys.argv[4])
             # tick = float(sys.argv[5])
         except:
@@ -73,15 +85,8 @@ class Console(object):
             .format(threshold, log_path, interval)
         )
 
-        self.timed_queue = TimeBoundQueueProvider.get(threshold, window, tick, self)
-        self.timed_queue.start()
-
-        self.monitor = MonitorProvider.get(threshold, log_path, self, self.timed_queue)
-        self.monitor.start()
-
-        self.polling_stop = threading.Event()
-        self.stats_polling_thread = threading.Thread(target = self.stats_poll, args=(self.polling_stop,))
-        self.stats_polling_thread.start()
+        self.start_routine(threshold, log_path, None)
+        
         
 
 ''' 
