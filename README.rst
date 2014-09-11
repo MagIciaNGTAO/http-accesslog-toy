@@ -1,5 +1,5 @@
 ======
-http-accesslog-toy
+http-accesslog-toy (support version: Python 3)
 ======
 
 A simple http access log monitor.
