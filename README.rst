@@ -31,4 +31,4 @@ Running Tests
 
 Run tests. ::
 
-    python test_log_monitor.py
+    python3 test_log_monitor.py
