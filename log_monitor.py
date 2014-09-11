@@ -40,7 +40,6 @@ class Console(object):
 
     def stop(self):
         self.polling_stop.set()
-        self.monitor.stop()
         self.timed_queue.stop()
 
     def stats_poll(self, stop_event):
@@ -131,10 +130,6 @@ class Monitor(threading.Thread):
         if self.maxsection is not None :
             return self.maxsection, self.counter[self.maxsection]
         return 'not exist', 0
-
-    def stop(self):
-        log('stop tailing the log file')
-        # TODO self._stop.set()
 
 ''' 
 TimeBoundQueue
