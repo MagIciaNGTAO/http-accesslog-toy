@@ -5,7 +5,7 @@ HTTP log monitoring console program
 Usage:
     python3 log_monitor.py 100 /private/var/log/apache2/access_log # start monitoring process
 """
-import sys, threading, time, signal, subprocess, re, time, queue
+import sys, threading, time, signal, subprocess, re, time, queue, tailer
 
 default_window = 120 # analysis window for 120 seconds
 interval = 10 # wait for 10 seconds
@@ -64,9 +64,7 @@ class Console(object):
         self.stats_polling_thread = threading.Thread(target = self.stats_poll, args=(self.polling_stop,))
         self.stats_polling_thread.start()
 
-
     def main(self):
-        self.polling = True
 
         # add user interrupt handler
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -85,9 +83,7 @@ class Console(object):
             .format(threshold, log_path, interval)
         )
 
-        self.start_routine(threshold, log_path, None)
-        
-        
+        self.start_routine(threshold, log_path, None)    
 
 ''' 
 Monitor is responsible for
@@ -109,11 +105,7 @@ class Monitor(threading.Thread):
         self.maxsection = None
 
     def run(self):
-        self.subprocess = subprocess.Popen(["tail", "-f", self.log_path], stdout=subprocess.PIPE)
-        log('start tail -f process')
-        while True:
-            row = self.subprocess.stdout.readline().decode("utf-8")
-
+        for row in tailer.follow(open(self.log_path)):
             # TODO refactoring using visitor pattern
             section = Monitor.get_section(row)
             self.timed_queue.put(section)
@@ -125,8 +117,6 @@ class Monitor(threading.Thread):
                 if self.counter[section] > self.maxcount:
                     self.maxcount = self.counter[section]
                     self.maxsection = section
-            if not row:
-                break
 
     def get_section(row):
         tokens = map(''.join, re.findall(r'\"GET /(.*?) HTTP.*\"', row))
@@ -144,7 +134,6 @@ class Monitor(threading.Thread):
 
     def stop(self):
         log('stop tailing the log file')
-        self.subprocess.kill()
         # TODO self._stop.set()
 
 ''' 

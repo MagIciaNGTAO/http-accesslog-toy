@@ -37,10 +37,12 @@ with open(sample_file_name) as f:
         time.sleep(access_frequency)
         log_file.flush() 
 
+# assert alert on is called
 sut.fixture.assert_any_call('on')
 
 time.sleep(waiting_time)
 
+# assert alert off is called
 sut.fixture.assert_any_call('off')
 
 sut.stop()
